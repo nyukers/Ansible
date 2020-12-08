@@ -1,0 +1,58 @@
+---
+- name: boot server
+  hosts: localhost
+  gather_facts: false
+
+# Ќаш модуль ec2 создаЄт некую новую виртуальную машину при каждом своЄм запуске, пока вы не установите свой параметр exact_count совместно с параметром count_tags (упом€нутый в строке instance_tags набор параметров).
+
+# «начение пол€ user_data может примен€тьс€ дл€ отправки сценариев выполнени€ после создани€ в свою новую ¬ћ; это неверо€тно полезно в случае когда первоначальна€ конфигураци€ требуетс€ немедленно, предоставл€€ себе команды raw. ¬ данном случае мы примен€ем его дл€ установки предварительных требований Python с целью последующей инсталл€ции ImageMagick. 	   
+
+# ANSIBLE_HOST_KEY_CHECKING=False
+# --private-key mastery-key.pem
+
+- name: boot the server
+      ec2:
+        access_key: XXXXXXXXXXXXXXXXX
+        secret_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+        keypair: mastery-key
+        group: default
+        type: t2.medium
+        image: "ami-000848c4d7224c557"
+        region: eu-west-2
+        instance_tags: "{'ansible_group':'mastery_server', 'Name':'mastery1'}"
+        exact_count: 1
+        count_tag:
+          ansible_group: "mastery_server"
+        wait: true
+        user_data: |
+          #!/bin/bash
+          sudo dnf install -y python python2-dnf
+      register: newserver
+
+# ѕриводимый модуль ec2 требует установленной в своЄм хосте Ansible библиотеки boto; методы дл€ этого будут отличатьс€ дл€ операционных систем, 
+# однако в нашем демонстрационном хосте CentOS7 она была установлена командой sudo yum install python-boto.
+
+- name: show floating ip
+      debug:
+        var: newserver.tagged_instances[0].public_ip
+
+- name: Wait for SSH to come up
+      wait_for_connection:
+        timeout: 320
+
+- name: add new server
+  add_host:
+    name: "mastery1"
+    ansible_ssh_host: "{{ newserver.tagged_instances[0].public_ip }}"
+    ansible_ssh_user: "fedora"
+
+- name: configure server
+  hosts: mastery1
+  gather_facts: false
+
+  tasks:
+    - name: install imagemagick
+      dnf:
+        name: "ImageMagick"
+      become: "yes"
+	  
