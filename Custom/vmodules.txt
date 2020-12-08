@@ -1,0 +1,213 @@
+"Полное руководство работы с сетями на Python"
+Эрик Чоу
+
+http://onreader.mdl.ru/MasteringPythonNetworking/content/Ch05.html#07
+
+Глава 5. Инфраструктура автоматизации Python - дополнительные вопросы Ansible
+Написание вашего собственного пользовательского модуля.
+
+На данный момент вам может начать казаться, что управление сетевыми средствами во многом зависит от обнаружения правильного модуля для своего устройства. 
+Модули предоставляют некий способ абстрактного взаимодействия между управляемым хостом и самой управляющей машиной, 
+в то время как он делает для вас возможным сосредоточиться на самой логике вашей работы. До этого момента мы видели, 
+что все основные производители предоставляют некий широкий диапазон поддержки модулей для Cisco, Juniper и Arista.
+
+Рассмотрим в качестве примера модули Cisco Nexus, помимо конкретных задач, таких как управление соседним BGP (nxos_bgp) и сервером aaa (nxos_aaa_server), 
+большинство производителей также предоставляют способы исполнения произвольного отображения (nxos_config) и настройки (nxos_config) команд. 
+
+Но что если используемое нами в настоящий момент устройство не имеет прямо сейчас никаких модулей, которые мы бы могли найти в сети? 
+
+Поэтому мы рассмотрим способ которым можно устранить такую ситуацию написав свой собственный пользовательский модуль.
+
+1-й пользовательский модуль.
+
+Написание некоторого пользовательского модуля не обязательно усложнять, на самом деле он даже не обязан быть на Python. 
+Но сегодня мы будем использовать Python для наших пользовательских модулей. Мы предполагаем, что данный модуль это то, что мы будем применять самостоятельно и в 
+своей команде не обращаясь дополнительно к Ansible, таким образом игнорируя некое документирование и форматирование.
+
+По умолчанию, если вы создаёте некую папку библиотеки в том же самом каталоге, что и ваш плейбук, Ansible включит этот каталог в путь поиска модуля. 
+Такие модули должны возвращать некий вывод JSON обратно в свой плейбук.
+
+Мы применим сценарий Python NXAPI для взаимодействия с устройством NX-OS
+(custom-1.py):
+
+#!/usr/bin/env python2
+
+import requests
+import json
+
+url='http://172.16.1.142/ins'
+switchuser='cisco'
+switchpassword='cisco'
+
+myheaders={'content-type':'application/json-rpc'}
+payload=[
+  {
+    "jsonrpc": "2.0",
+    "method": "cli",
+    "params": {
+      "cmd": "show version",
+      "version": 1.2
+    },
+    "id": 1
+  }
+]
+
+response = requests.post(url,data=json.dumps(payload),headers=myheaders,auth=(switchuser,switchpassword)).json()
+
+print(response['result']['body']['sys_ver_str'])
+print json.dumps({"version": version})
+ 	   
+Когда мы его выполним, мы просто получим номер версии системы. Если мы просто изменим самую последнюю строку с тем чтобы она выполняла вывод в 
+формате JSON, мы увидим следующее:
+
+version: "7.3(0)D1(1)"
+ 	   
+Затем мы можем воспользоваться в нашем плейбуке встраиваемым модулем действия (https://docs.ansible.com/ansible/dev_guide/developing_plugins.html), 
+для вызова данного пользовательского модуля (chapter514.yml):
+
+---
+- name: Your First Custom Module
+  hosts: localhost
+  gather_facts: false
+  connection: local
+
+  tasks:
+    - name: Show Version
+      action: custom_module_1
+      register: output
+
+    - debug:
+        var: output
+ 	   
+Отметим, что в точности как и при соединении через ssh мы исполняем этот модуль локально при том что этот модуль делает исходящие вызовы API. 
+Когда вы выполните данный плейбук, вы получите следующий вывод:
+
+$ ansible-playbook chapter514.yml
+[WARNING]: provided hosts list is empty, only localhost is available
+PLAY [Your First Custom Module] ************************************************
+
+TASK [Show Version] ************************************************************
+ok: [localhost]
+
+TASK [debug] *******************************************************************
+ok: [localhost] => {
+ "output": {
+ "changed": false,
+ "version": "7.3(0)D1(1)"
+ }
+} 
+
+PLAY RECAP *********************************************************************
+localhost : ok=2 changed=0 unreachable=0 failed=0
+ 	   
+Как вы можете видеть, можно написать любой модуль, который поддерживается API и Ansible успешно примет любой возвращаемый вывод JSON.
+
+2-й пользовательский модуль.
+
+При построении своего 2-го модуля давайте воспользуемся имеющимся в Ansible модулем общего назначения Boilerplate (заготовок кода), 
+как это описывается в документации разработки модуля (http://docs.ansible.com/ansible/dev_guide/developing_modules_general.html). Мы изменим самый последний 
+пользовательский модуль в custom_module_2.py чтобы воспользоваться захвата входа из своего плейбука.
+
+Вначале мы импортируем сам код Boilerplate из ansible.module_utils.basic:
+
+from ansible.module_utils.basic import AnsibleModule
+
+if __name__ == '__main__':
+    main()
+ 	   
+Начиная с этого момента мы можем затем определять свою основную функцию в которой мы поместим наш код. AnsibleModule предоставляет множество общего 
+кода для обработки возвращаемых результатов и синтаксического разбора аргументов. В нашем следующем примере мы проведём синтаксический разбор 
+аргументов для host, username и password и сделаем их необходимыми полями:
+
+def main():
+    module = AnsibleModule(
+      argument_spec = dict(
+      host = dict(required=True),
+      username = dict(required=True),
+      password = dict(required=True)
+      )
+    )
+ 	   
+Данные значения затем могут быть получены и использованы далее в нашем коде:
+
+device = module.params.get('host')
+username = module.params.get('username')
+password = module.params.get('password')
+
+url='http://' + host + '/ins'
+switchuser=username
+switchpassword=password
+ 	   
+Наконец, мы вернём своё значение:
+
+module.exit_json(changed=False, msg=str(data))
+ 	   
+Наш новый плейбук будет выглядеть в точности как самый последний приведённый нами ранее с одним исключением - 
+теперь, когда мы можем передавать значения для различных устройств в своём плейбуке (chapter515.yml):
+
+---
+- name: Your First Custom Module
+  hosts: localhost
+  gather_facts: false
+  connection: local
+ 
+  tasks:
+    - name: Show Version
+      action: custom_module_1 host="172.16.1.142" username="cisco" password="cisco"
+      register: output
+
+    - debug:
+        var: output
+	   
+После исполнения данный плейбук выдаст в точности тот же самый вывод, как и наш первый плейбук. Однако отметим, что этот плейбук 
+и модуль может быть передан коллегам людям для его применения без необходимости знания каких-либо подробностей.
+
+(custom-2.py)
+ 
+#!/usr/bin/env python2
+
+import requests
+import json
+
+def main():
+    module = AnsibleModule(
+      argument_spec = dict(
+        host = dict(required=True),
+        username = dict(required=True),
+        password = dict(required=True)
+      )
+    )
+    
+    device = module.params.get('host')
+    username = module.params.get('username')
+    password = module.params.get('password')
+
+    url='http://' + host + '/ins'
+    switchuser=username
+    switchpassword=password
+
+    myheaders={'content-type':'application/json-rpc'}
+    
+    payload=[
+      {
+        "jsonrpc": "2.0",
+        "method": "cli",
+        "params": {
+          "cmd": "show version",
+          "version": 1.2
+        },
+        "id": 1
+      }
+    ]
+    response = requests.post(url,data=json.dumps(payload), headers=myheaders,auth=(switchuser,switchpassword)).json()
+
+    version = response['result']['body']['sys_ver_str']
+    data = json.dumps({"version": version})
+    module.exit_json(changed=False, msg=str(data))
+
+
+from ansible.module_utils.basic import AnsibleModule
+if __name__ == '__main__':
+    main()
+
+
