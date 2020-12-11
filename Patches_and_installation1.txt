@@ -1,0 +1,56 @@
+Patches and installation.
+
+Story by Janathan Lozada De La Matta.
+
+So we’ve learned how to update a system, restart the 
+VM, reconnect, and install a RPM. 
+
+  - name: update the system
+    yum:
+      name: "*"
+      state: latest
+
+In the first line, we give the task a meaningful name so we 
+know what Ansible is doing. In the next line, the yum module 
+updates the CentOS virtual machine (VM), then name: "*" 
+tells yum to update everything, and, finally, state: latest 
+updates to the latest RPM.
+
+After updating the system, we need to restart and re-
+connect:
+
+  - name: restart system to reboot to newest kernel
+    shell: "sleep 5 && reboot"
+    async: 1
+    poll: 0
+
+  - name: wait for 10 seconds
+    pause:
+      seconds: 10
+
+  - name: wait for the system to reboot
+    wait_for_connection:
+      connect_timeout: 20
+      sleep: 5
+      delay: 5
+      timeout: 60
+
+  - name: install epel-release
+    yum:
+      name: epel-release
+      state: latest
+
+The shell module puts the system to sleep for 5 seconds 
+then reboots. We use sleep to prevent the connection from 
+breaking, async to avoid timeout, and poll to fire & forget. 
+
+We pause for 10 seconds to wait for the Vm to come back 
+and use wait_for_connection to connect back to the Vm 
+as soon as it can make a connection. 
+
+Then we install epel-release to test the RPM installation. You can run this 
+playbook  multiple  times  to  show  the  idempotent, and the 
+only task that will show as changed is the reboot since we 
+are using the shell  module.  You  can  use  changed_when: 
+False to ignore the change when using the shell module if 
+you expect no actual changes.

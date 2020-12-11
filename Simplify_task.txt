@@ -1,0 +1,118 @@
+How to simplify task.
+
+Story by Janathan Lozada De La Matta
+
+1) Managing users.
+If you need to create a large list of users and groups with 
+the users spread among the different groups, you can use 
+loops. Let’s start by creating the groups:
+
+- name: create user groups
+  group:
+    name: "{{ item }}"
+  loop:
+    - postgresql
+    - nginx-test
+    - admin
+    - dbadmin
+    - hadoop
+
+You can create users with specific parameters like this:
+
+- name: all users in the department
+  user:
+    name:  "{{ item.name }}"
+    group: "{{ item.group }}"
+    groups: "{{ item.groups }}"
+    uid: "{{ item.uid }}"
+    state: "{{ item.state }}"
+  loop:
+    - { name: 'admin1', group: 'admin', groups: 'nginx', uid: '1234', state: 'present' }
+    - { name: 'dbadmin1', group: 'dbadmin', groups: 'postgres', uid: '4321', state: 'present' }
+    - { name: 'user1', group: 'hadoop', groups: 'wheel', uid: '1067', state: 'present' }
+    - { name: 'jose', group: 'admin', groups: 'wheel', uid: '9000', state: 'absent' }
+
+2) To deploy SSH keys for some of the users, you can use the 
+same type of looping as in the last example.
+
+- name: copy admin1 and dbadmin ssh keys
+  authorized_key:
+    user: "{{ item.user }}"
+    key: "{{ item.key }}"
+    state: "{{ item.state }}"
+    comment: "{{ item.comment }}"
+
+  loop:
+    - { user: 'admin1', key: "{{ lookup('file', '/data/test_
+        temp_key.pub'), state: 'present', comment: 'admin1 key' }
+    - { user: 'dbadmin', key: "{{ lookup('file',  
+       '/data/vm_temp_key.pub'), state: 'absent',  
+        comment: 'dbadmin key' }
+
+3) The following uses the yum module to install NGINX, disable 
+gpg_check from the repo, ignore the repository’s certificates, 
+nd skip any broken packages that might show up.
+
+  - name: install a package
+    yum:
+      name: nginx
+      state: installed
+      disable_gpg_check: yes
+      validate_certs: no
+      skip_broken: yes
+
+
+
+4) If you used best practices and created your role using 
+ansible-galaxy init "role name", then you should have 
+the full directory structure [15]. you can include the code 
+above inside the handlers/main.yml and call it when you 
+make a change with the application. For example
+handlers/main.yml
+
+  - name: reload postgresql for new configuration and reload daemon
+    systemd:
+      name: postgresql
+      state: reload
+      daemon-reload: yes
+
+
+This is the task that calls the handler:
+  - name: con0gure postgresql
+    template:
+      src: postgresql.service.j2
+      dest: /usr/lib/systemd/system/postgresql.service
+    notify: reload postgresql for new configuration and reload daemon
+
+5) Here’s an example of provisioning a virtual machine (VM) 
+with the openstack cloud solution.
+
+  - name: create a VM in openstack     
+    osp_server:       
+      name: cloudera-namenode       
+      state: present       
+      cloud: openstack
+      region_name: andromeda
+      image: 923569a-c777-4g52-t3y9-cxvhl86zx345
+      flavor_ram: 20146
+      flavor: big
+      auto_ip: yes
+      volumes: cloudera-namenode
+
+
+  - name: restart some servers
+    os_server_action:
+      action: start
+      cloud: openstack
+      region_name: andromeda
+      server: cloudera-namenode
+
+Most Openstack modules use similar options. therefore, 
+to rebuild the server, we can use the same options but 
+change the action to rebuild and add the image we want 
+it to use:
+
+    os_server_action:
+      action: rebuild
+      image: 923569a-c777-4g52-t3y9-cxvhl86zx345
+

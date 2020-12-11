@@ -1,0 +1,204 @@
+Testing Ansible roles  with Molecule
+
+Story author - Jairo da Silva Junior.
+
+Learn how to automate your verifications using Python.
+
+Test Techniques role in software development, and this is no different when we are talking about infrastructure as Code (iaC).
+developers are always testing, and constant feedback is 
+necessary to drive development. if it takes too long to get feedback on a change, your steps might be too large, making errors hard to spot. baby steps and fast feedback are the essence of tdd (test-driven development). but how do you apply this approach to the development of ad hoc playbooks or roles?
+
+When you’re developing an automation, a typical workflow would start with a new virtual machine. i will use Vagrant [1] to illustrate this idea, but you could use libvirt [2], docker [3], Virtualbox [4], or Vmware [5], an instance in a private or public cloud, or a virtual machine provisioned in your data center hypervisor (oVirt [6], Xen [7], or Vmware, for example).
+
+When deciding which virtual machine to use, balance feedback speed and similarity with your real target environment.
+
+The minimal start point with Vagrant would be:
+
+vagrant init centos/7 # or any other box
+
+Then add Ansible provisioning to your Vagrantfile:
+
+config.vm.provision "ansible" do |ansible|   
+  ansible.playbook = "playbook.yml" 
+end
+
+In the end, your workflow would be:
+1. vagrant up 2. edit playbook. 
+3. vagrant provision 
+4. vagrant ssh to verify Vm state. 
+5. repeat steps 2 to 4. 
+
+Occasionally, the Vm should be destroyed and brought up again (vagrant destroy -f; vagrant up) to increase the reliability of your playbook (i.e., to test if your automation is working end-to-end).
+
+Although this is a good workflow, you’re still doing all the hard work of connecting to the Vm and verifying that everything is working as expected.
+
+When tests are not automated, you’ll face issues similar to those when you do not automate your infrastructure.
+luckily, tools like testinfra [8] and Goss [9] can help auto-
+mate these verifications.
+
+I will focus on testinfra, as it is written in python and is the 
+default verifier for Molecule. The idea is pretty simple: Automate your verifications using Python:
+
+def test_nginx_is_installed(host):     
+    nginx = host.package("nginx")     
+    assert nginx.is_installed     
+    assert nginx.version.startswith("1.2")
+
+def test_nginx_running_and_enabled(host):
+    nginx = host.service("nginx")     
+    assert nginx.is_running     
+    assert nginx.is_enabled
+
+In a development environment, this script would connect to the target host using ssH (just like Ansible) to perform the above verifications (package presence/version and service state):
+
+py.test --connection=ssh --hosts=server
+
+In short, during infrastructure automation development, the challenge is to provision new infrastructure, execute playbooks against them, and verify that your changes reflect the state you declared in your playbooks.
+•What can Testinfra verify?
+ •Infrastructure is up and running from the user’s point of view (e.g., Httpd or nginx is answering requests, and mariadb or postgresQl is handling sQl queries). 
+ •OS service is started and enabled 
+ •A process is listening on a specific port 
+ •A process is answering requests 
+ •Configuration files were correctly copied or generated from templates 
+ •Virtually anything you do to ensure that your server state is correct 
+•What safeties do these automated tests provide?
+ •Perform complex changes or introduce new features without breaking existing behavior (e.g., it still works in rHelbased distributions after adding support for debian-based systems). 
+ •Refactor/improve the codebase when new versions of Ansible are released and new best practices are introduced. 
+
+What we’ve done with Vagrant, Ansible, and Testinfra so far is easily mapped to the steps described in the four-phase test [10] pattern—a way to structure tests that makes the test objective clear. it is composed of the following phases: Setup, Exercise, Verify, and Teardown:
+
+•Setup: prepares the environment for the test execution (e.g., spins up new virtual machines):
+
+vagrant up
+
+•Exercise: effectively executes the code against the system under test (i.e., Ansible playbook): 
+
+vagrant provision
+
+•Verify: Verifies the previous step output: 
+
+py.test (with testinfra)
+
+•Teardown: returns to the state prior to Setup:
+
+vagrant destroy
+
+the same idea we used for an ad hoc playbook could be applied to role development and testing, but do you need to do all these steps every time you develop something new? What if you want to use containers, or an openstack, instead of Vagrant? What if you’d rather use Goss than Testinfra? How do you run this continuously for every change in your code? is there a more simple and fast way to develop our playbooks and roles with automated tests?
+
+Molecule
+
+molecule [11] helps develop roles using tests. The tool can even initialize a new role with test cases: 
+
+molecule init role –role-name foo
+
+Molecule is flexible enough to allow you to use different drivers for infrastructure provisioning, including docker, Vagrant, openstack, GCe, eC2, and Azure. it also allows the use of different server verification tools, including Testinfra and Goss.
+
+Its commands ease the execution of tasks commonly used 
+during development workflow:
+
+•lint - executes yaml-lint, ansible-lint, and flake8, reporting failure if there are issues 
+•syntax - Verifies the role for syntax errors 
+•create - Creates an instance with the configured driver 
+•prepare - Configures instances with preparation playbooks •  converge - executes playbooks targeting hosts 
+•idempotence - executes a playbook twice and fails in case of changes in the second run (non-idempotent) 
+•verify - Execute server state verification tools (testinfra or goss) 
+•destroy - destroys instances 
+•test - executes all the previous steps the login command can be used to connect to provisioned servers for troubleshooting purposes.
+
+Step by Step
+
+How do you go from no tests at all to a decent codebase being executed for every change/commit? 
+
+1) virtualenv (optional)
+
+The virtualenv tool creates isolated environments, while virtualenvwrapper is a collection of extensions that facilitate the use of virtualenv.
+
+These tools prevent dependencies and conflicts between molecule and other python packages in your machine.
+
+sudo pip install virtualenvwrapper 
+export WORKON_HOME=~/envs 
+source /usr/local/bin/virtualenvwrapper.sh 
+mkvirtualenv mocule 
+
+2) molecule 
+
+Install molecule with the docker driver: 
+
+pip install molecule ansible docker 
+
+Generate a new role with test scenarios: 
+
+molecule init role -r role_name
+
+or for existing roles:
+
+molecule init scenario -r my-role
+
+All the necessary configuration is generated with your role, and you need only write test cases using testinfra: 
+
+import os
+
+import testinfra.utils.ansible_runner
+
+testinfra_hosts = testinfra.utils.ansible_runner.AnsibleRunner(os.environ['MOLECULE_INVENTORY_FILE']).get_hosts('all')
+
+def test_jboss_running_and_enabled(host):
+    jboss = host.service('wildfly')
+
+    assert jboss.is_enabled
+
+def test_jboss_listening_http(host):     
+    socket = host.socket('tcp://0.0.0.0:8080')
+
+    assert socket.is_listening
+
+def test_mgmt_user_authentication(host):
+    command = """ curl --digest -L -D - http://localhost:9990/ \ 
+                  management -u ansible:ansible"""
+
+    cmd = host.run(command)
+
+    assert 'HTTP/1.1 200 OK' in cmd.stdout
+
+This example test case for a Wildfly role verifies that OS service is enabled, a process is listening in port 8080, and authentication is properly configurated.
+
+Coding these tests is straightforward, and you basically need to think about an automated way to verify something.
+you are already writing tests when you log into a machine targeted by your playbook, or when you build verifications for your monitoring/alerting systems. This knowledge will contribute to building something with the testinfra Api [12] or using a system command.
+
+CI
+
+Continuously executing your molecule tests is simple. the example above works for TravisCI with the docker driver, but it could be easily adapted for any Ci server and any infrastructure drivers supported by molecule.
+
+---
+sudo: required 
+language: python 
+services:   
+  - docker 
+before_install:   
+  - sudo apt-get -qq update
+  - pip install molecule
+  - pip install docker 
+script:
+  - molecule test
+
+Visit Travis CI [13] for sample output. 
+
+Links
+[1]	https://github.com/hashicorp/vagrant
+[2]	https://libvirt.org/
+[3]	https://www.docker.com/
+[4]	https://www.virtualbox.org/
+[5]	https://www.vmware.com/
+[6]	https://ovirt.org/
+[7]	https://www.xenproject.org/
+[8]	https://testinfra.readthedocs.io/en/latest/
+[9]	https://github.com/aelsabbahy/goss
+[10]	http://xunitpatterns.com/Four Phase Test.html
+[11]	https://molecule.readthedocs.io/en/latest/
+[12]	https://testinfra.readthedocs.io/en/latest/
+[13]	https://travis-ci.org/jairojunior/ansible-role-jboss/ builds/345731738
+ 
+
+Author  
+Jairo da silva Junior—developer, speaker at devops conferences, open source contributor, occasional writer, and obsessed with tests and automation. Can’t live without CLI tools.
+Adapted from “testing Ansible roles with molecule” on opensource.com, published under a Creative Commons Attribution share-Alike 4.0 international license at https://opensource.com/article/18/12/testing-ansible-roles-molecule.
