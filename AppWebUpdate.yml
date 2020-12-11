@@ -1,0 +1,49 @@
+---
+- name: Upgrade foo-app in place
+  hosts: foo-app
+  serial: 2
+ 	   
+# Disable foo-app from Load balancer (delegate to foo-lb)
+
+tasks:
+- name: disable member in balancer
+  haproxy:
+    backend: foo-app
+    host: "{{ inventory_hostname }}"
+    state: disabled
+  delegate_to: foo-lb
+
+# Update foo-app from Git and reload Nginx after it (notify)
+
+- name: pull stable foo-app
+  git:
+    repo: "{{ foo-app.repo }}"
+    dest: /srv/foo-app/
+    version: "{{ foo-version }}"
+  notify:
+    - reload nginx
+
+???
+- meta: flush_handlers
+
+# Check Nginx for listening 80 port
+
+- name: ensure healthy service
+  wait_for:
+    port: 80
+
+# Enable foo-app to Load balancer (delegate to foo-lb)
+
+- name: enable member in balancer
+  haproxy:
+    backend: foo-app
+    host: "{{ inventory_hostname }}"
+    state: enabled
+  delegate_to: foo-lb
+
+???
+handlers:
+  - name: reload nginx
+    service:
+      name: nginx
+      state: restarted

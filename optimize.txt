@@ -1,0 +1,32 @@
+Кешируем факты.
+
+gather_facts: False
+
+Off mode of gathering facts:
+
+[defaults]
+gathering = explicit
+
+
+
+Smart mode of gathering facts:
+
+[defaults]
+gathering = smart
+# 24 часа
+fact_caching_timeout = 86400
+fact_caching = jsonfile
+fact_caching_connection = /tmp/ansible_fact_cache
+
+
+Clear cache of gathering facts:
+
+ansible-playbook --flush-cache
+
+
+Параллельные потоки.
+
+[defaults]
+forks = 20
+-OR-
+export ANSIBLE_FORKS=20
