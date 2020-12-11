@@ -1,0 +1,11 @@
+---
+    - name: Run commands on Linux
+      hosts: linux
+
+      tasks:
+      - name: Run the equivalent of apt-get update
+        command: ls -l
+        register: result
+
+      - name: Debug
+        debug: var=result.stdout_lines
