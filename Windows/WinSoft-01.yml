@@ -1,0 +1,43 @@
+---
+- name: Windows file example playbook
+  hosts: all
+  gather_facts: false
+
+1) copy file for Win
+  tasks:
+    - name: Create temporary directory
+      win_file:
+        path: 'C:\Mastery Test'
+        state: directory
+    - name: Copy across a test file
+      win_copy:
+        src: ~/src/mastery/mastery.txt
+        dest: 'C:\Mastery Test\mastery.txt'
+
+2) Install package from Åxe
+
+- name: Install package from Åxe
+    win_package:
+      path: 'c:\temp\setupdownloader_`[aaff`].exe'
+      product_id: {00000000-0000-0000-0000-000000000000}
+      arguments: /silent /unattended
+      state: present
+ 	   
+3) install soft from Inet
+
+- name: Install Acrobat Reader
+  win_chocolatey:
+    name: adobereader
+    state: present
+
+4) execute ps-command
+
+- name: Create a directory using PowerShell
+      win_shell: New-Item -Path C:\Mastery -ItemType Directory
+ 
+5) execute cmd
+
+- name: Create a directory using cmd.exe
+      win_shell: mkdir C:\MasteryCMD
+      args:
+        executable: cmd	   

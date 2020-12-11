@@ -1,0 +1,9 @@
+---
+- name: Run commands on Win
+  hosts: windows
+
+  tasks:
+  - name: Check for missing updates
+    win_updates: 
+        state: searched
+        log_path: C:\VM\shared\Ansible\ansible_wu.log

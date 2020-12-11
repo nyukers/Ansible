@@ -1,0 +1,11 @@
+
+# For Windows #################################################
+#Проверка подключения
+
+ansible windows -m win_ping
+
+#Для установки обновлений только на контроллеры домена 
+
+ansible-playbook -i inventory.yml -s DC.yml
+
+
