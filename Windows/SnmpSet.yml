@@ -1,0 +1,25 @@
+---
+- name: Run commands on Win
+  hosts: windows
+  
+  tasks:
+
+  - name: Set service startup mode to auto and ensure it is started
+    win_service:
+      name: SNMP
+      start_mode: auto
+      state: started
+      path: C:\Windows\system32\svchost.exe -k LocalServiceNoNetwork
+    register: result
+
+  - name: Replace SNMP communities and managers
+    win_snmp:
+      community_strings:
+        - sunhose
+      permitted_managers:
+        - 192.168.1.202
+        - 127.0.0.1
+      action: set
+
+  - name: Debug
+    debug: var=result.stdout_lines

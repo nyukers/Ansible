@@ -1,0 +1,31 @@
+# Надо посчитать, сколько обновлений не хватает
+
+– name: Check for missing updates
+  win_updates: state=searched
+     register: update_count
+
+# Для установки определенных обновлений
+
+- name: Install specific updates based on the KBs for those updates
+  win_updates:
+    category_name:
+    - SecurityUpdates
+
+    whitelist:
+    - KB4073819
+    - KB4074228
+
+# Для установки всех доступных обновлений с последующей перезагрузкой
+
+- name: Install all critical and security updates
+  win_updates:
+    category_names:
+    - CriticalUpdates
+    - SecurityUpdates
+    - UpdateRollups
+    state: installed
+  register: update_result
+
+- name: reboot host if required
+  win_reboot:
+  when: update_result.reboot_required

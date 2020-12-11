@@ -1,0 +1,11 @@
+---
+- name: Run commands on Win
+  hosts: windows
+
+  tasks:
+  - name: SNMP Installer
+    win_shell: DISM /online /add-capability /capabilityname:SNMP.Client~~~~0.0.1.0
+    register: result
+
+  - name: Debug
+    debug: var=result.stdout_lines
