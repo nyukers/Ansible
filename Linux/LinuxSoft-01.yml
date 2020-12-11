@@ -1,0 +1,85 @@
+В Ansible имеется модуль с названием package, который предпринимает попытку определения верного диспетчера пакетов 
+для его использования на основании той операционной системы, для которой выполняется данный плейбук.
+
+---
+- name: Install MariaDB
+  hosts: all
+  become: yes
+
+  roles:
+    - installmariadb
+
+
+1) Role installmariadb as Installation:
+---
+
+- name: Install MariaDB Server on Ubuntu or Debian
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - mariadb-server
+    - mariadb-client
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+- name: Install MariaDB Server on CentOS or RHEL
+  yum:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - mariadb-server
+    - mariadb
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+
+2) Role installmariadb as Deinstallation:
+---
+
+- name: Install MariaDB Server on Ubuntu or Debian
+  apt:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - mariadb-server
+    - mariadb-client
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+- name: Install MariaDB Server on CentOS or RHEL
+  yum:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - mariadb-server
+    - mariadb
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+3) установка без загрузки пакета
+
+---
+- name: Install Duplicati beta on Ubuntu
+  apt:
+    deb: https://github.com/duplicati/duplicati/releases/download/v2.0.4.23-2.0.4.23_beta_2019-07-14/duplicati_2.0.4.23-1_all.deb
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+- name: Install Duplicati beta on CentOS or RHEL
+  yum:
+    name: https://github.com/duplicati/duplicati/releases/download/v2.0.4.23-2.0.4.23_beta_2019-07-14/duplicati-2.0.4.23-2.0.4.23_beta_20190714.noarch.rpm
+    state: present
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+4) установка без пакета
+#! shell выполняется всегда при запуске плейбука
+
+---
+- name: download virtualmin install script
+  get_url:
+   url: http://software.virtualmin.com/gpl/scripts/install.sh
+   dest: /root/install.sh
+   mode: 0755
+
+- name: virtualmin install (takes around 10 mins) you can see progress using: tail -f /root/virtualmin-install.log
+  shell: /root/install.sh --force --hostname {{ inventory_hostname }} --minimal --yes
+  args:
+    chdir: /root
+
+

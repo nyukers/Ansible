@@ -1,0 +1,36 @@
+---
+#¬ывести значение переменной:
+
+- name: "Ansible | Print a variable"
+  debug:
+    msg: "The operating system is {{ ansible_distribution }}"
+
+#Ќапечатать переменную только если она определена:
+
+- name: "Ansible | Print a variable if defined"
+  debug:
+    msg: "The 'foo' variable value is {{ foo }}"
+  when: foo is defined
+
+- name: "Ansible | Print a message if a variable is undefined"
+  debug:
+    msg: "The 'bar' variable is undefined"
+  when: bar is not defined
+
+#ѕечать нескольких переменных:
+
+- name: "Ansible | Print multiple variable"
+  debug:
+    msg: |
+      The role is {{ host_role }}
+      The environment is {{ host_environment }}
+
+#¬ывести список всех известных фактов и переменных:
+
+- name: "Ansible | List all known variables and facts"
+  debug:
+    var: hostvars[inventory_hostname]
+
+#¬ывести список всех локальных переменных:
+
+ansible windows -m setup -a "filter=ansible_local"

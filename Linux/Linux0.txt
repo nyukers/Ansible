@@ -1,0 +1,200 @@
+# For Master #################################################
+
+apt-get install python-pip
+pip install --upgrade pip
+pip install --upgrade virtualenv
+
+sudo pip install ansible
+
+sudo pip install pywinrm
+-OR-
+sudo pip install "pywinrm>=0.2.2"
+
+
+Ansible общается с хостами параллельно!
+
+host0.example.org:host1.example.org будет запущен на host0.example.org и на host1.example.org
+
+host*.example.org будет запущен на всех хостах, названия которых начинается с 'host' 
+и заканчивается на '.example.org' (тоже как в shell)
+
+
+# For Linux #################################################
+
+ansible -i inventory.yml -m shell -a 'uname -a' host0.example.org
+
+#copy file.txt в host0.example.org
+ansible -i inventory.yml -m copy -a 'src=/etc/file.txt dest=/tmp/' host0.example.org
+
+#получить верcию всех линуксов
+ansible -i inventory.yml -m shell -a 'grep DISTRIB_RELEASE /etc/lsb-release' all
+
+#еще больше информации
+ansible -i inventory.yml -m setup host0.example.org
+
+#сколько памяти на хостах
+ansible -i inventory.yml -m setup -a 'filter=ansible_memtotal_mb' all
+
+#install Apache
+ansible-playbook -i inventory.yml -l host1.example.org Linux.yml
+
+
+# For AWS hosts #################################################
+export AWS_ACCESS_KEY_ID='ASIASQX5GFOZKW3ZXKPT'
+export AWS_SECRET_ACCESS_KEY='5XlOrduKT+mHnbmHgpRzsM8/zuNNF+s+sDzTVkdS'
+export AWS_SESSION_TOKEN='FwoGZXIvYXdzEDUaDEgIYHtEN97J6zEIViLGAUt5ZNO+SyZpow9sqb3giej/pgXXRegi4EncolZFCagKj1rOsV4RXb87V+lMCksXfN7OzVuK3T2tlrHtUYw2ih1YJ1Ws75VP1fDCjhW/gKZVqCxY6ZzJ/u9dtvHmb5N3Ym8LkrjTG+GwNO84STpD0pn57On/En/zBClb2vuG0FbdLGz41xVHsBJvWtgC6yvgFKB+rRJMTINtxeImd3WiSlOU32VV5+21/ZlvQEhi2kirvNur0vPs0g+DpnYKWpwMVpAv0ukiayjXloz4BTItjFUIQ3/5oz/oWz8Xz0rQRJV2nIgxA7UNqTfWW2R/IJvHKJv6an4HS60iWkzo'
+
+
+-------------------------------------------------------------
+Примеры для Linux
+-------------------------------------------------------------
+
+Проект Ansible. «Дирижируем» ИТ-инфраструктурой
+Даниил Прахин
+
+# yum install http://download.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+# yum install ansible
+
+# cat /etc/ansible/hosts
+[Workstations]
+10.203.96.113
+10.203.96.97
+[Remote]
+10.203.96.113
+[Local]
+localhost
+
+remote_tmp = /tmp/.ansible/tmp
+
+log_path = /var/log/ansible.log
+
+# ansible Workstations –m ping –u root --ask-pwd
+
+# 1-я задача для всех ПК for Remote group
+
+# файла /etc/ansible/hosts:
+hosts: Remote		# Все хосты в группе Remote
+remote_user: root	# Используем учетную запись root
+
+tasks:
+name: Uptime!		# Название задачи «Uptime!»
+
+# Модуль: shell, Команда: /usr/bin/uptime
+shell: /usr/bin/uptime
+
+# Сохраняем результат выполнения в переменную result
+register: result	
+
+# Модуль: debug, Вывод переменной result
+debug: var=result
+
+# 2-я задача для всех ПК for Local group
+
+# файла /etc/ansible/hosts:
+hosts: Local
+remote_user: root
+
+tasks:
+# Модуль: user, имя пользователя: tester, 
+# uid: 99999, group: users
+name: Add the user!
+user: name=tester comment="This is the Ansible user" uid=99999 group=users
+
+# Модуль: yum, имя пакета: xorg-x11-fonts-cyrillic, 
+# состояние: present - установить
+name: Install the package x11-font!
+yum: name=xorg-x11-fonts-cyrillic state=present
+
+# Модуль: service, имя службы: cups, состояние: stopped
+name: Stop the CUPS service!
+service: name=cups state=stopped
+
+# 3-я задача для всех ПК for Workstations group
+
+# файла /etc/ansible/hosts:
+
+hosts: Workstations
+remote_user: root
+
+tasks:
+# Модуль: script, путь расположения 
+# скрипта на Control Machine: /root/test-pl.pl
+name: Execute Perl Script!
+script: /root/test-pl.pl
+register: result
+
+# Модуль: file, путь к файлу: /tmp/test.cfg, 
+# owner, group: sshd, mode: 0173=x-rwx-wx
+name: Change the File's permissions it it was created
+file: path=/tmp/test.cfg owner=sshd group=sshd mode=0173
+when: result|changed
+
+
+#!/usr/bin/perl
+open (FILEHANDLE, ">/tmp/test.cfg") or die ("Cannot open the file");
+print FILEHANDLE "Hi from Perl!";
+close (FILEHANDLE);
+
+
+# ansible-playbook test-playbook.yml --list-tasks --list-hosts
+
+# ansible-playbook test-playbook.yml --f 2 --ask-pass
+
+
+
+# Ansible-tower 
+
+# ./configure --local
+
+# ./setup.sh
+
+# service Ansible-tower status
+--------------------------------------------
+
+Хотел рассказать о таком ПО как ansible. 
+Ansible является отличным инструментом, для управления одного или нескольких серверов или выполнять на них определенных действий.
+
+В примере у нас будет мой десктоп
+PC1 = 192.168.1.1
+
+И виртуальная машина, исполняющая роль "сервера".
+VM1 = 192.168.1.2
+
+Поехали:
+
+1. Установка и первоначальная настройка:
+1.1 Можно установить из репозитория вашей системы если есть:
+sudo apt-get install ansible
+1.2 По умолчанию ansible создает файлы конфигурации и файлы для исполнения в /etc/ansible
+но вы можете разместить файлы исполнения где вам удобно.
+1.3 cd /etc/ansible && ls -la
+ansible.cfg - основной конфигурационный файл ansible.
+hosts - файл в котором мы описываем хосты к которым мы будем подключаться (ansible ипользует ssh).
+1.4 vim /etc/asnible/hosts
+Там имеется закоментированное описание того как создавать хосты.
+#[ ] в таких скобках указывается группа хостов.
+# далее идут сами хосты ИМЯ ansible_....параметры. 
+
+[VM]
+VM1 ansible_ssh_host=192.168.1.2 ansible_ssh_password=$SSHPASS ansible_sudo_pass=$SSHPASS
+
+#Если у вас в /etc/hosts или в ~/.ssh/config не прописаны значения для VM1 то указываем их тут в файле hosts.
+#$SSHPASS познакомьтесь это переменная окружения документация ansible не советует держать пароль а открытом виде в целях безопасности, но вы можете это делать.
+#Заводим переменную окружения export SSHPASS=yourpassw0rd, так же можно использовать ssh ключи параметр: ansible_ssh_private_key_file=/path/to/file.
+#Так как нам понадобится исполнять комманды от привелигированного пользователя, то нужно разрешить sudo без пароля на сервере, либо указать ansible_sudo_pass=$SSHPASS как это сделал я.
+##Как делается sudo без пароля: vim /etc/sudoers.d/username с содержимым username ALL=(ALL:ALL) NOPASSWD:ALL
+
+2. Playbook и как это работает:
+
+Playbook`s пишется в формате .yml с соответствующему убогости синтаксиса YAML.
+Напишем простенький плейбук vim test.yml (в YAML запрещена табуляция, только пробелы)
+---
+  - hosts: VM1
+        tasks:
+        - name: LISTDIR
+          command: ls -la
+
+2.1 Стартуем:
+ansible-playbook test.yml
+
+---------------------------------------------------

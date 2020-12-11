@@ -1,0 +1,8 @@
+---
+    - name: Run commands on 
+      hosts: linux
+
+      tasks:
+      - name: print magic vars
+        debug:
+          var: vars
