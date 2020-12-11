@@ -1,0 +1,43 @@
+[cisco-routers]
+192.168.100.1
+192.168.100.2
+192.168.100.3
+
+[cisco-switches]
+192.168.100.100
+
+[cisco-ios:children]
+cisco-routers
+cisco-switches
+
+[windows]
+192.168.1.180
+
+[windows:vars]
+ansible_user=admin
+ansible_password='xxxxxxxxx'
+ansible_port=5986
+ansible_connection=winrm
+ansible_winrm_scheme=https
+ansible_winrm_server_cert_validation=ignore
+
+[windowsAWS]
+ec2-54-197-120-211.compute-1.amazonaws.com
+
+[windowsAWS:vars]
+ansible_user=Administrator
+ansible_password='2uGk57F&ylknWL.;tj;ET.8l9%.3p5'
+ansible_port=5986
+ansible_connection=winrm
+ansible_winrm_scheme=https
+ansible_winrm_server_cert_validation=ignore
+
+[linux]
+ubuntu@ec2-54-88-28-8.compute-1.amazonaws.com 
+ec2-54-88-28-8.compute-1.amazonaws.com ansible_ssh_user=ubuntu
+
+
+Your key must not be publicly viewable for SSH to work. Use this command if needed:
+chmod 400 Mykey.pem
+
+ssh -i "Mykey.pem" ubuntu@ec2-54-88-28-8.compute-1.amazonaws.com
